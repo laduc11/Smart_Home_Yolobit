@@ -1,0 +1,8 @@
+.idea
+
+# virtual environment
+.venv/
+.venv38/
+
+__pycache__/
+accountKey/
