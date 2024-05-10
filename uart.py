@@ -4,18 +4,18 @@ import datetime
 
 
 def get_port():
-    # return "COM2"
-    ports = serial.tools.list_ports.comports()
-    n = len(ports)
-    comm_port = "None"
-    for i in range(0, n):
-        port = ports[i]
-        str_port = str(port)
-        # print(str_port)
-        if "SERIAL" in str_port:
-            split_port = str_port.split(" ")
-            comm_port = (split_port[0])
-    return comm_port
+    return "COM2"
+    # ports = serial.tools.list_ports.comports()
+    # n = len(ports)
+    # comm_port = "None"
+    # for i in range(0, n):
+    #     port = ports[i]
+    #     str_port = str(port)
+    #     # print(str_port)
+    #     if "SERIAL" in str_port:
+    #         split_port = str_port.split(" ")
+    #         comm_port = (split_port[0])
+    # return comm_port
 
 
 COMMAND_FROM_CIRCUIT = {
@@ -25,6 +25,8 @@ COMMAND_FROM_CIRCUIT = {
     "door": "open_door"
 }
 COMMAND_FROM_SERVER = {
+    "password": "password",
+    "change password": "change password",
     "fan_level": "fan",
     "light": "light",
     "air_conditioner": "air conditioner",
@@ -46,9 +48,6 @@ def process_data(data):
     split_data = data.split(":")
     name_field = split_data[0]
     value_field = split_data[1]
-    # print(f"Name: {COMMAND_FROM_CIRCUIT[name_field]}")
-    # print(f"Value: {value_field}")
-
     return COMMAND_FROM_CIRCUIT[name_field], value_field
 
 
@@ -82,7 +81,6 @@ def write_data(name=None, value=None):
 
 def get_time(return_second=False):
     now = datetime.datetime.now()
-    print(now)
     day = str(now.day)
     month = str(now.month)
     year = str(now.year)
@@ -115,22 +113,3 @@ def send_time():
         write_data("hour", hour)
         write_data("minute", minute)
         start_time = time.time()
-        print("sending time")
-
-
-def main():
-    global start_time
-    while True:
-        data = read_serial()
-        if len(data) > 0:
-            print(data)
-
-        fan_level = input("Fan Level: ")
-        write_data("fan_level", str(fan_level))
-        pass
-    pass
-
-
-# if __name__ == "__main__":
-#     main()
-    # print(get_time())
