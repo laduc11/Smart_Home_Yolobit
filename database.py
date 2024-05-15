@@ -66,5 +66,5 @@ def update_dashboard(name=None, value=None):
         if value < 0:
             return
     if name == "open_door":
-        value = True if value == "1" else False
+        value = True if value == '1' else False
     DASHBOARD.update({name: value})

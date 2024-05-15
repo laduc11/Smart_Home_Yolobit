@@ -38,6 +38,7 @@ def recognize(pic=None, threshold=0.9):
         similarity = 1 - spatial.distance.cosine(embedding[0], vector)
         if similarity >= threshold:
             similar_face.append((class_name, similarity))
+            # print to test model
             print("class name: {}, similarity value: {}".format(class_name, similarity))
 
     if len(similar_face) != 0:
