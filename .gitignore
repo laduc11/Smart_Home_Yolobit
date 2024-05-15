@@ -6,3 +6,5 @@
 
 __pycache__/
 accountKey/
+
+face_recognition/face_recognition.ipynb
