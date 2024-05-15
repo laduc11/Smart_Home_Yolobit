@@ -103,7 +103,7 @@ def get_time(return_second=False):
     return day, month, year, hour, minute
 
 
-def send_time():
+def send_time(file_name):
     global start_time
     if time.time() - start_time > 10:
         day, month, year, hour, minute = get_time()
@@ -112,4 +112,6 @@ def send_time():
         write_data("year", year)
         write_data("hour", hour)
         write_data("minute", minute)
+        with open(file_name, mode='a') as file:
+            print(f"day: {day}, month: {month}, year: {year}, hour: {hour}, minute: {minute}", file=file)
         start_time = time.time()

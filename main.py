@@ -55,7 +55,7 @@ def update_time_for_circuit(file_name):
     global close_gateway
     while not close_gateway[0]:
         LOCK.acquire(blocking=True)
-        uart.send_time()
+        uart.send_time(file_name)
         # log activities to file
         with open(file_name, mode='a') as file:
             print("sending time", file=file)
@@ -92,6 +92,11 @@ def send_password():
                 while len(picture_from_camera) > 0:
                     picture_from_camera.pop()
                 LOCK.release()
+                # delete all old results
+                LOCK.acquire(blocking=True)
+                while len(result_from_model) > 0:
+                    result_from_model.pop()
+                LOCK.release()
                 # turn on camera and stream the video real time
                 camera = cv2.VideoCapture(0)
                 # set flag camera to True
@@ -127,6 +132,7 @@ def send_password():
                 camera.release()
                 # set flag camera to False
                 LOCK.acquire(blocking=True)
+                result_from_model.pop()
                 camera_on[0] = False
                 LOCK.release()
                 cv2.destroyAllWindows()
@@ -167,8 +173,11 @@ def main():
     print("gateway is running")
     # log activities to output.log
     log_file = "output.log"
+    # clear file
+    with open(log_file, mode='w') as file:
+        pass
 
-    uart.send_time()
+    uart.send_time(log_file)
 
     thread_for_server = threading.Thread(target=receive_data_from_server, args=(log_file,))
     thread_for_uart = threading.Thread(target=receive_data_from_uart, args=(log_file,))
