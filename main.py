@@ -4,7 +4,6 @@ import uart
 import database
 import cv2
 import face_recognition.face as model
-# import face_recognition.save_pic as update_data
 
 
 LOCK = threading.Lock()
@@ -16,8 +15,6 @@ result_from_model = []
 
 def receive_data_from_server(file_name):
     global close_gateway
-    snapshot_database_changed = threading.Thread(target=database.database_changed)
-    snapshot_database_changed.start()
 
     while not close_gateway[0]:
         if database.is_database_changed[0]:
@@ -53,14 +50,18 @@ def receive_data_from_uart(file_name):
 
 def update_time_for_circuit(file_name):
     global close_gateway
+    start_time = time.time()
     while not close_gateway[0]:
+        if time.time() - start_time < 30:
+            continue
+        else:
+            start_time = time.time()
         LOCK.acquire(blocking=True)
         uart.send_time(file_name)
         # log activities to file
         with open(file_name, mode='a') as file:
             print("sending time", file=file)
         LOCK.release()
-        time.sleep(30)
 
 
 def send_password():
@@ -74,6 +75,7 @@ def send_password():
             option = input("Enter your option: ")
             if option == 'close':
                 close_gateway[0] = True
+                database.stop_check_database[0] = True
                 continue
 
             while option != '1' and option != '2':
@@ -160,7 +162,7 @@ def send_password():
 
 
 def open_door_with_face_recognition():
-    while True:
+    while not close_gateway[0]:
         if camera_on[0] and len(picture_from_camera) > 0:
             name, is_known = model.recognize(pic=picture_from_camera[0], threshold=0.9)
             LOCK.acquire(blocking=True)
@@ -184,20 +186,22 @@ def main():
     thread_update_time = threading.Thread(target=update_time_for_circuit, args=(log_file,))
     thread_for_password = threading.Thread(target=send_password)
     thread_for_recognize_face = threading.Thread(target=open_door_with_face_recognition)
+    snapshot_database_changed = threading.Thread(target=database.database_changed)
 
     thread_for_server.start()
     thread_for_uart.start()
     thread_update_time.start()
     thread_for_password.start()
     thread_for_recognize_face.start()
+    snapshot_database_changed.start()
 
     thread_for_server.join()
     thread_for_uart.join()
     thread_update_time.join()
     thread_for_password.join()
     thread_for_recognize_face.join()
+    snapshot_database_changed.join()
 
-    uart.SER.close()
     print("end")
 
 

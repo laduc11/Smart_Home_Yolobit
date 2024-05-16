@@ -39,13 +39,12 @@ def setup_db(account_key, db_url):
 
 def database_changed():
     global prev_database, is_database_changed, stop_check_database
-    while True:
-        if not stop_check_database[0]:
-            cur_db = DASHBOARD.get()
-            if cur_db != prev_database[0]:
-                is_database_changed[0] = True
-            else:
-                is_database_changed[0] = False
+    while not stop_check_database[0]:
+        cur_db = DASHBOARD.get()
+        if cur_db != prev_database[0]:
+            is_database_changed[0] = True
+        else:
+            is_database_changed[0] = False
 
 
 def log_activity(activity_name="", actor="Manual",
