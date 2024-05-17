@@ -13,6 +13,8 @@ camera_on = [False]
 picture_from_camera = []
 result_from_model = []
 user_password = "1016"
+enable_faceID = [True]
+NUMBER_OF_FACES = 10
 
 
 def receive_data_from_server(file_name):
@@ -65,15 +67,17 @@ def update_time_for_circuit(file_name):
 
 
 def process_command_door():
-    global close_gateway
+    global close_gateway, enable_faceID
     while not close_gateway[0]:
         if database.DASHBOARD.get()['open_door']:
+            enable_faceID[0] = True
             activities_when_door_opened()
         else:
             activities_when_door_closed()
 
 
 def activities_when_door_closed():
+    global enable_faceID
     # door is close
     print("The door is closed. Choose the way to open the door")
     print("1. Type the password")
@@ -85,14 +89,17 @@ def activities_when_door_closed():
         close_gateway[0] = True
         database.stop_check_database[0] = True
     else:
-        if option != '1' and option != '2':
-            print("Invalid option")
-        elif option == '1':
+        if option == '1':
             # allow user type password to open it
             password = input("Enter your password: ")
             verify_password(password)
-        elif option == '2':
-            turn_on_camera()
+        elif option == '2' and enable_faceID[0]:
+            is_open = turn_on_camera()
+            if not is_open:
+                enable_faceID[0] = False
+                database.log_activity(activity_name='Phát hiện người lạ cố gắng mở khóa cửa', actor='Unknown')
+        else:
+            print("Invalid option")
 
 
 def activities_when_door_opened():
@@ -116,6 +123,7 @@ def activities_when_door_opened():
         LOCK.acquire(blocking=True)
         uart.write_data('open_door', '0')
         database.update_dashboard('open_door', '0')
+        database.log_activity('Đóng cửa')
         LOCK.release()
 
 
@@ -147,6 +155,7 @@ def turn_on_camera():
     LOCK.acquire(blocking=True)
     camera_on[0] = True
     LOCK.release()
+    counter = NUMBER_OF_FACES
     # stream video using open-cv
     while True:
         ret, frame = camera.read()
@@ -166,6 +175,11 @@ def turn_on_camera():
                 database.log_activity('Đã xác minh khuôn mặt để mở cửa', actor=name)
                 database.update_dashboard('open_door', '1')
                 break
+            else:
+                counter -= 1
+            result_from_model.pop()
+        if counter == 0:
+            break
         # save the frame to recognize face
         if len(picture_from_camera) == 0:
             LOCK.acquire(blocking=True)
@@ -177,10 +191,12 @@ def turn_on_camera():
     camera.release()  # turn off the camera
     # set flag camera to False
     LOCK.acquire(blocking=True)
-    result_from_model.pop()
     camera_on[0] = False
     LOCK.release()
     cv2.destroyAllWindows()
+    if counter == 0:
+        return False
+    return True
 
 
 def open_door_with_face_recognition():
