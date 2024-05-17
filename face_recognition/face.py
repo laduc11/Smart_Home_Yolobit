@@ -36,10 +36,10 @@ def recognize(pic=None, threshold=0.9):
         class_name = string[:string.index(' ')].replace("\n", "")
         vector = np.fromstring(string[string.index(' ') + 3:string.index(']]')].replace("\n", ""), dtype=float, sep=' ')
         similarity = 1 - spatial.distance.cosine(embedding[0], vector)
+        # print to test model
+        print("class name: {}, similarity value: {}".format(class_name, similarity))
         if similarity >= threshold:
             similar_face.append((class_name, similarity))
-            # print to test model
-            print("class name: {}, similarity value: {}".format(class_name, similarity))
 
     if len(similar_face) != 0:
         sorted_similar_face = sorted(similar_face, key=lambda node: node[1], reverse=True)

@@ -4,18 +4,18 @@ import datetime
 
 
 def get_port():
-    return "COM2"
-    # ports = serial.tools.list_ports.comports()
-    # n = len(ports)
-    # comm_port = "None"
-    # for i in range(0, n):
-    #     port = ports[i]
-    #     str_port = str(port)
-    #     # print(str_port)
-    #     if "SERIAL" in str_port:
-    #         split_port = str_port.split(" ")
-    #         comm_port = (split_port[0])
-    # return comm_port
+    # return "COM2"
+    ports = serial.tools.list_ports.comports()
+    n = len(ports)
+    comm_port = "None"
+    for i in range(0, n):
+        port = ports[i]
+        str_port = str(port)
+        # print(str_port)
+        if "SERIAL" in str_port:
+            split_port = str_port.split(" ")
+            comm_port = (split_port[0])
+    return comm_port
 
 
 COMMAND_FROM_CIRCUIT = {
@@ -104,14 +104,11 @@ def get_time(return_second=False):
 
 
 def send_time(file_name):
-    global start_time
-    if time.time() - start_time > 10:
-        day, month, year, hour, minute = get_time()
-        write_data("day", day)
-        write_data("month", month)
-        write_data("year", year)
-        write_data("hour", hour)
-        write_data("minute", minute)
-        with open(file_name, mode='a') as file:
-            print(f"day: {day}, month: {month}, year: {year}, hour: {hour}, minute: {minute}", file=file)
-        start_time = time.time()
+    day, month, year, hour, minute = get_time()
+    write_data("day", day)
+    write_data("month", month)
+    write_data("year", year)
+    write_data("hour", hour)
+    write_data("minute", minute)
+    with open(file_name, mode='a') as file:
+        print(f"day: {day}, month: {month}, year: {year}, hour: {hour}, minute: {minute}", file=file)

@@ -6,11 +6,13 @@ import cv2
 import face_recognition.face as model
 
 
+# define global variable
 LOCK = threading.Lock()
 close_gateway = [False]
 camera_on = [False]
 picture_from_camera = []
 result_from_model = []
+user_password = "1016"
 
 
 def receive_data_from_server(file_name):
@@ -52,113 +54,133 @@ def update_time_for_circuit(file_name):
     global close_gateway
     start_time = time.time()
     while not close_gateway[0]:
-        if time.time() - start_time < 30:
-            continue
-        else:
+        if time.time() - start_time > 30:
             start_time = time.time()
+            LOCK.acquire(blocking=True)
+            uart.send_time(file_name)
+            # log activities to file
+            with open(file_name, mode='a') as file:
+                print("sending time", file=file)
+            LOCK.release()
+
+
+def process_command_door():
+    global close_gateway
+    while not close_gateway[0]:
+        if database.DASHBOARD.get()['open_door']:
+            activities_when_door_opened()
+        else:
+            activities_when_door_closed()
+
+
+def activities_when_door_closed():
+    # door is close
+    print("The door is closed. Choose the way to open the door")
+    print("1. Type the password")
+    print("2. Use face recognition")
+    print("If you want to close the gateway, please type close")
+    option = input("Enter your option: ")
+    if option == 'close':
+        # close gateway
+        close_gateway[0] = True
+        database.stop_check_database[0] = True
+    else:
+        if option != '1' and option != '2':
+            print("Invalid option")
+        elif option == '1':
+            # allow user type password to open it
+            password = input("Enter your password: ")
+            verify_password(password)
+        elif option == '2':
+            turn_on_camera()
+
+
+def activities_when_door_opened():
+    global user_password
+    # door is open
+    # allow user change the password or lock the door
+    print("The door is opened. Choose your option:")
+    print("1. Change your password")
+    print("2. Close the door")
+    option = input("Enter your option: ")
+    while option != '1' and option != '2':
+        print("Invalid option")
+        option = input("Enter your option: ")
+
+    if option == '1':
+        new_password = input("Enter your new password: ")
         LOCK.acquire(blocking=True)
-        uart.send_time(file_name)
-        # log activities to file
-        with open(file_name, mode='a') as file:
-            print("sending time", file=file)
+        user_password = new_password
+        LOCK.release()
+    elif option == '2':
+        LOCK.acquire(blocking=True)
+        uart.write_data('open_door', '0')
+        database.update_dashboard('open_door', '0')
         LOCK.release()
 
 
-def send_password():
-    global close_gateway
-    while not close_gateway[0]:
-        if not database.DASHBOARD.get()['open_door']:
-            # door is close
-            print("The door is closed. Choose the way to open the door")
-            print("1. Type the password")
-            print("2. Use face recognition")
-            option = input("Enter your option: ")
-            if option == 'close':
-                close_gateway[0] = True
-                database.stop_check_database[0] = True
-                continue
+def verify_password(password):
+    if password == user_password:
+        LOCK.acquire(blocking=True)
+        uart.write_data('open_door', '1')
+        database.update_dashboard('open_door', '1')
+        database.log_activity('Cửa được mở bằng mật khẩu')
+        LOCK.release()
+    else:
+        print("Wrong password")
 
-            while option != '1' and option != '2':
-                print("Invalid option")
-                option = input("Enter your option: ")
 
-            if option == '1':
-                # allow user type password to open it
-                password = input("Enter your password: ")
+def turn_on_camera():
+    # delete all old picture
+    LOCK.acquire(blocking=True)
+    while len(picture_from_camera) > 0:
+        picture_from_camera.pop()
+    LOCK.release()
+    # delete all old results
+    LOCK.acquire(blocking=True)
+    while len(result_from_model) > 0:
+        result_from_model.pop()
+    LOCK.release()
+    # turn on camera and stream the video real time
+    camera = cv2.VideoCapture(0)
+    # set flag camera to True
+    LOCK.acquire(blocking=True)
+    camera_on[0] = True
+    LOCK.release()
+    # stream video using open-cv
+    while True:
+        ret, frame = camera.read()
+        cv2.imshow('camera', frame)  # show a frame
+        if len(result_from_model) > 0:
+            # get result after run model recognize face
+            LOCK.acquire(blocking=True)
+            name, is_known = result_from_model[-1]
+            LOCK.release()
+            if is_known:
+                # if finding best face, return the name of person who open the door
+                print(f"person unlock the door: {name}")
+                # send command unlock through uart and history message to firebase
                 LOCK.acquire(blocking=True)
-                uart.write_data('password', password)
+                uart.write_data('open_door', '1')
                 LOCK.release()
-            elif option == '2':
-                # delete all old picture
-                LOCK.acquire(blocking=True)
-                while len(picture_from_camera) > 0:
-                    picture_from_camera.pop()
-                LOCK.release()
-                # delete all old results
-                LOCK.acquire(blocking=True)
-                while len(result_from_model) > 0:
-                    result_from_model.pop()
-                LOCK.release()
-                # turn on camera and stream the video real time
-                camera = cv2.VideoCapture(0)
-                # set flag camera to True
-                LOCK.acquire(blocking=True)
-                camera_on[0] = True
-                LOCK.release()
-                while True:
-                    ret, frame = camera.read()
-                    cv2.imshow('camera', frame)     # show a frame
-                    if len(result_from_model) > 0:
-                        # get result after run model recognize face
-                        LOCK.acquire(blocking=True)
-                        name, is_known = result_from_model[-1]
-                        LOCK.release()
-                        if is_known:
-                            # if finding best face, return the name of person who open the door
-                            print(f"person unlock the door: {name}")
-                            # send command unlock through uart and history message to firebase
-                            LOCK.acquire(blocking=True)
-                            uart.write_data('open_door', '1')
-                            LOCK.release()
-                            database.log_activity('open door', actor=name)
-                            database.update_dashboard('open_door', '1')
-                            break
-                    # save the frame to recognize face
-                    if len(picture_from_camera) == 0:
-                        LOCK.acquire(blocking=True)
-                        picture_from_camera.append(frame)
-                        LOCK.release()
-                    # turn off camera by pressing q button
-                    if cv2.waitKey(1) & 0xFF == ord('q'):
-                        break
-                camera.release()
-                # set flag camera to False
-                LOCK.acquire(blocking=True)
-                result_from_model.pop()
-                camera_on[0] = False
-                LOCK.release()
-                cv2.destroyAllWindows()
-        else:
-            # door is open
-            # allow user change the password or lock the door
-            print("The door is opened. Choose your option:")
-            print("1. Change your password")
-            print("2. Close the door")
-            option = input("Enter your option: ")
-            while option != '1' and option != '2':
-                print("Invalid option")
-                option = input("Enter your option: ")
-
-            if option == '1':
-                new_password = input("Enter your new password: ")
-                LOCK.acquire(blocking=True)
-                uart.write_data('change password', new_password)
-                LOCK.release()
-            elif option == '2':
-                LOCK.acquire(blocking=True)
-                uart.write_data('open_door', '0')
-                database.update_dashboard('open_door', '0')
-                LOCK.release()
+                database.log_activity('Đã xác minh khuôn mặt để mở cửa', actor=name)
+                database.update_dashboard('open_door', '1')
+                break
+        # save the frame to recognize face
+        if len(picture_from_camera) == 0:
+            LOCK.acquire(blocking=True)
+            picture_from_camera.append(frame)
+            LOCK.release()
+        # turn off camera by pressing q button
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+    camera.release()  # turn off the camera
+    # set flag camera to False
+    LOCK.acquire(blocking=True)
+    result_from_model.pop()
+    camera_on[0] = False
+    LOCK.release()
+    cv2.destroyAllWindows()
 
 
 def open_door_with_face_recognition():
@@ -177,14 +199,14 @@ def main():
     log_file = "output.log"
     # clear file
     with open(log_file, mode='w') as file:
-        pass
+        file.write("")
 
     uart.send_time(log_file)
 
     thread_for_server = threading.Thread(target=receive_data_from_server, args=(log_file,))
     thread_for_uart = threading.Thread(target=receive_data_from_uart, args=(log_file,))
     thread_update_time = threading.Thread(target=update_time_for_circuit, args=(log_file,))
-    thread_for_password = threading.Thread(target=send_password)
+    thread_for_password = threading.Thread(target=process_command_door)
     thread_for_recognize_face = threading.Thread(target=open_door_with_face_recognition)
     snapshot_database_changed = threading.Thread(target=database.database_changed)
 
@@ -202,7 +224,7 @@ def main():
     thread_for_recognize_face.join()
     snapshot_database_changed.join()
 
-    print("end")
+    print("gateway is closed")
 
 
 if __name__ == '__main__':
